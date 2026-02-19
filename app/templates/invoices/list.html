@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% set active_page = "invoices" %}
+
+{% block title %}Invoices — Freight Invoice Agent{% endblock %}
+
+{% block content %}
+<h2>Invoices</h2>
+
+<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+    <div>
+        <select id="status-filter" aria-label="Filter by status" style="display:inline-block; width:auto;">
+            <option value="">All Statuses</option>
+            <option value="draft">Draft</option>
+            <option value="sent">Sent</option>
+            <option value="partial">Partial</option>
+            <option value="paid">Paid</option>
+            <option value="overdue">Overdue</option>
+            <option value="void">Void</option>
+        </select>
+    </div>
+    <div>
+        <a href="/shipments" role="button" class="outline">Generate from Shipment</a>
+    </div>
+</div>
+
+<article>
+    <table>
+        <thead>
+            <tr>
+                <th>Invoice #</th>
+                <th>Client</th>
+                <th class="text-right">Amount</th>
+                <th class="text-right">Paid</th>
+                <th class="text-right">Balance</th>
+                <th>Status</th>
+                <th>Issue Date</th>
+                <th>Due Date</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody id="invoices-table">
+            <tr><td colspan="9">Loading...</td></tr>
+        </tbody>
+    </table>
+</article>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function fmt(amount) {
+    return '$' + Number(amount || 0).toLocaleString(undefined, {minimumFractionDigits: 2});
+}
+
+async function loadInvoices() {
+    const status = document.getElementById('status-filter').value;
+    let url = '/api/invoices';
+    if (status) url += '?status=' + encodeURIComponent(status);
+
+    const tbody = document.getElementById('invoices-table');
+    tbody.innerHTML = '<tr><td colspan="9">Loading...</td></tr>';
+
+    try {
+        const resp = await fetch(url);
+        if (!resp.ok) throw new Error('Failed to load invoices: ' + resp.statusText);
+        const data = await resp.json();
+
+        if (!data.length) {
+            tbody.innerHTML = '<tr><td colspan="9">No invoices found.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = data.map(inv => `
+            <tr>
+                <td><a href="/invoices/${inv.id}">${inv.invoice_number || ''}</a></td>
+                <td>${inv.client_name || ''}</td>
+                <td class="text-right">${fmt(inv.total_amount)}</td>
+                <td class="text-right">${fmt(inv.amount_paid)}</td>
+                <td class="text-right">${fmt(inv.balance_due)}</td>
+                <td><span class="badge badge-${inv.status}">${inv.status}</span></td>
+                <td>${inv.issue_date || ''}</td>
+                <td>${inv.due_date || ''}</td>
+                <td><a href="/invoices/${inv.id}">View</a></td>
+            </tr>
+        `).join('');
+    } catch (err) {
+        tbody.innerHTML = '<tr><td colspan="9">Error loading invoices.</td></tr>';
+        alert(err.message);
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    loadInvoices();
+    document.getElementById('status-filter').addEventListener('change', loadInvoices);
+});
+</script>
+{% endblock %}

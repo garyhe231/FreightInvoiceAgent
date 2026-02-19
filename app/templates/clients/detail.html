@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+{% set active_page = "clients" %}
+
+{% block title %}Client — Freight Invoice Agent{% endblock %}
+
+{% block content %}
+<div id="client-loading">
+    <h2>Loading client...</h2>
+</div>
+
+<div id="client-detail" style="display:none;">
+    <h2 id="client-name"></h2>
+
+    <!-- Client Info -->
+    <article>
+        <header>Client Information</header>
+        <div class="grid">
+            <div>
+                <table>
+                    <tbody>
+                        <tr><td><strong>Company Name</strong></td><td id="cl-company"></td></tr>
+                        <tr><td><strong>Type</strong></td><td id="cl-type"></td></tr>
+                        <tr><td><strong>Contact Name</strong></td><td id="cl-contact"></td></tr>
+                        <tr><td><strong>Email</strong></td><td id="cl-email"></td></tr>
+                        <tr><td><strong>Phone</strong></td><td id="cl-phone"></td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div>
+                <table>
+                    <tbody>
+                        <tr><td><strong>Address</strong></td><td id="cl-address"></td></tr>
+                        <tr><td><strong>City</strong></td><td id="cl-city"></td></tr>
+                        <tr><td><strong>Country</strong></td><td id="cl-country"></td></tr>
+                        <tr><td><strong>Payment Terms</strong></td><td id="cl-terms"></td></tr>
+                        <tr><td><strong>Tax ID</strong></td><td id="cl-tax-id"></td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </article>
+
+    <!-- Outstanding Balance -->
+    <article>
+        <header>Outstanding Balance</header>
+        <p class="big-number" id="cl-balance">$0.00</p>
+    </article>
+
+    <!-- Recent Invoices -->
+    <article>
+        <header>Recent Invoices</header>
+        <table>
+            <thead>
+                <tr>
+                    <th>Invoice #</th>
+                    <th class="text-right">Amount</th>
+                    <th class="text-right">Balance</th>
+                    <th>Status</th>
+                    <th>Issue Date</th>
+                    <th>Due Date</th>
+                </tr>
+            </thead>
+            <tbody id="client-invoices-table">
+                <tr><td colspan="6">Loading...</td></tr>
+            </tbody>
+        </table>
+    </article>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const CLIENT_ID = '{{ client_id }}';
+
+function fmt(amount) {
+    return '$' + Number(amount || 0).toLocaleString(undefined, {minimumFractionDigits: 2});
+}
+
+async function loadClient() {
+    try {
+        const resp = await fetch('/api/clients/' + CLIENT_ID);
+        if (!resp.ok) throw new Error('Failed to load client: ' + resp.statusText);
+        const c = await resp.json();
+
+        document.title = c.company_name + ' — Freight Invoice Agent';
+        document.getElementById('client-name').textContent = c.company_name || '';
+
+        document.getElementById('cl-company').textContent = c.company_name || '—';
+        document.getElementById('cl-type').textContent = c.client_type || '—';
+        document.getElementById('cl-contact').textContent = c.contact_name || '—';
+        document.getElementById('cl-email').textContent = c.email || '—';
+        document.getElementById('cl-phone').textContent = c.phone || '—';
+        document.getElementById('cl-address').textContent = c.address || '—';
+        document.getElementById('cl-city').textContent = c.city || '—';
+        document.getElementById('cl-country').textContent = c.country || '—';
+        document.getElementById('cl-terms').textContent = c.payment_terms || '—';
+        document.getElementById('cl-tax-id').textContent = c.tax_id || '—';
+
+        document.getElementById('client-loading').style.display = 'none';
+        document.getElementById('client-detail').style.display = '';
+
+    } catch (err) {
+        document.getElementById('client-loading').innerHTML = '<h2>Error loading client</h2>';
+        alert(err.message);
+    }
+}
+
+async function loadClientInvoices() {
+    const tbody = document.getElementById('client-invoices-table');
+    try {
+        const resp = await fetch('/api/invoices?client_id=' + CLIENT_ID);
+        if (!resp.ok) throw new Error('Failed to load invoices');
+        const data = await resp.json();
+
+        if (!data.length) {
+            tbody.innerHTML = '<tr><td colspan="6">No invoices for this client.</td></tr>';
+            document.getElementById('cl-balance').textContent = '$0.00';
+            return;
+        }
+
+        // Calculate outstanding balance
+        const totalBalance = data.reduce((sum, inv) => sum + (inv.balance_due || 0), 0);
+        document.getElementById('cl-balance').textContent = fmt(totalBalance);
+
+        tbody.innerHTML = data.map(inv => `
+            <tr>
+                <td><a href="/invoices/${inv.id}">${inv.invoice_number || ''}</a></td>
+                <td class="text-right">${fmt(inv.total_amount)}</td>
+                <td class="text-right">${fmt(inv.balance_due)}</td>
+                <td><span class="badge badge-${inv.status}">${inv.status}</span></td>
+                <td>${inv.issue_date || ''}</td>
+                <td>${inv.due_date || ''}</td>
+            </tr>
+        `).join('');
+    } catch (err) {
+        tbody.innerHTML = '<tr><td colspan="6">Error loading invoices.</td></tr>';
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    loadClient();
+    loadClientInvoices();
+});
+</script>
+{% endblock %}

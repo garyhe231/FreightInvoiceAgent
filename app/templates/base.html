@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Freight Invoice Agent{% endblock %}</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+    <link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body>
+    <nav class="container-fluid">
+        <ul>
+            <li><strong>Freight Invoice Agent</strong></li>
+        </ul>
+        <ul>
+            <li><a href="/" {% if active_page == 'dashboard' %}class="active"{% endif %}>Dashboard</a></li>
+            <li><a href="/shipments" {% if active_page == 'shipments' %}class="active"{% endif %}>Shipments</a></li>
+            <li><a href="/invoices" {% if active_page == 'invoices' %}class="active"{% endif %}>Invoices</a></li>
+            <li><a href="/payments" {% if active_page == 'payments' %}class="active"{% endif %}>Payments</a></li>
+            <li><a href="/clients" {% if active_page == 'clients' %}class="active"{% endif %}>Clients</a></li>
+            <li><a href="/agent" {% if active_page == 'agent' %}class="active"{% endif %}>Agent</a></li>
+        </ul>
+    </nav>
+    <main class="container">
+        {% block content %}{% endblock %}
+    </main>
+    <footer class="container">
+        <small>Pacific Freight Solutions Inc. &mdash; Invoice Automation Agent</small>
+    </footer>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

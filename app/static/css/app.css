@@ -1,0 +1,49 @@
+.big-number {
+    font-size: 2rem;
+    font-weight: 700;
+    margin: 0;
+}
+
+.badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.badge-draft { background: #e0e0e0; color: #555; }
+.badge-sent { background: #bbdefb; color: #1565c0; }
+.badge-partial { background: #fff9c4; color: #f57f17; }
+.badge-paid { background: #c8e6c9; color: #2e7d32; }
+.badge-overdue { background: #ffcdd2; color: #c62828; }
+.badge-void { background: #f5f5f5; color: #999; }
+
+nav a.active {
+    font-weight: 700;
+    text-decoration: underline;
+}
+
+article header {
+    font-weight: 600;
+}
+
+footer {
+    text-align: center;
+    padding: 2rem 0;
+    opacity: 0.6;
+}
+
+table {
+    font-size: 0.9rem;
+}
+
+.text-right {
+    text-align: right;
+}
+
+button.small {
+    padding: 4px 12px;
+    font-size: 0.8rem;
+}

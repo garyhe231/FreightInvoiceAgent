@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% set active_page = "shipments" %}
+
+{% block title %}Shipments — Freight Invoice Agent{% endblock %}
+
+{% block content %}
+<h2>Shipments</h2>
+
+<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+    <label style="margin:0;">
+        <input type="checkbox" id="filter-unbilled" role="switch">
+        Show only unbilled
+    </label>
+</div>
+
+<article>
+    <table>
+        <thead>
+            <tr>
+                <th>Booking #</th>
+                <th>Shipper</th>
+                <th>Consignee</th>
+                <th>Origin → Dest</th>
+                <th>Container Type</th>
+                <th>Count / CBM</th>
+                <th>Status</th>
+                <th>Invoice</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody id="shipments-table">
+            <tr><td colspan="9">Loading...</td></tr>
+        </tbody>
+    </table>
+</article>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function fmt(amount) {
+    return '$' + Number(amount || 0).toLocaleString(undefined, {minimumFractionDigits: 2});
+}
+
+async function loadShipments() {
+    const unbilledOnly = document.getElementById('filter-unbilled').checked;
+    let url = '/api/shipments';
+    if (unbilledOnly) url += '?has_invoice=false';
+
+    const tbody = document.getElementById('shipments-table');
+    tbody.innerHTML = '<tr><td colspan="9">Loading...</td></tr>';
+
+    try {
+        const resp = await fetch(url);
+        if (!resp.ok) throw new Error('Failed to load shipments: ' + resp.statusText);
+        const data = await resp.json();
+
+        if (!data.length) {
+            tbody.innerHTML = '<tr><td colspan="9">No shipments found.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = data.map(s => {
+            const invoiceCol = s.invoice_id
+                ? `<a href="/invoices/${s.invoice_id}">${s.invoice_number || 'View'}</a>`
+                : `<button class="small outline" onclick="generateInvoice(${s.id}, this)">Generate Invoice</button>`;
+
+            return `
+                <tr>
+                    <td><a href="/shipments/${s.id}">${s.booking_number || ''}</a></td>
+                    <td>${s.shipper_name || ''}</td>
+                    <td>${s.consignee_name || ''}</td>
+                    <td>${s.origin_port || ''} → ${s.destination_port || ''}</td>
+                    <td>${s.container_type || ''}</td>
+                    <td>${s.container_count || '—'} / ${s.cbm || '—'}</td>
+                    <td>${s.status || ''}</td>
+                    <td>${invoiceCol}</td>
+                    <td><a href="/shipments/${s.id}">View</a></td>
+                </tr>
+            `;
+        }).join('');
+    } catch (err) {
+        tbody.innerHTML = '<tr><td colspan="9">Error loading shipments.</td></tr>';
+        alert(err.message);
+    }
+}
+
+async function generateInvoice(shipmentId, btn) {
+    btn.disabled = true;
+    btn.textContent = 'Generating...';
+    try {
+        const resp = await fetch('/api/invoices/generate/' + shipmentId, { method: 'POST' });
+        if (!resp.ok) {
+            const err = await resp.json();
+            throw new Error(err.detail || 'Failed to generate invoice');
+        }
+        alert('Invoice generated successfully.');
+        loadShipments();
+    } catch (err) {
+        alert(err.message);
+        btn.disabled = false;
+        btn.textContent = 'Generate Invoice';
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    loadShipments();
+    document.getElementById('filter-unbilled').addEventListener('change', loadShipments);
+});
+</script>
+{% endblock %}

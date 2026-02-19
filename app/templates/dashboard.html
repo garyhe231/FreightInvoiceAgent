@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% set active_page = "dashboard" %}
+
+{% block title %}Dashboard — Freight Invoice Agent{% endblock %}
+
+{% block content %}
+<h2>Dashboard</h2>
+
+<div class="grid">
+    <article id="card-total-ar">
+        <header>Total AR</header>
+        <p class="big-number" id="total-ar">$--</p>
+    </article>
+    <article id="card-invoices-month">
+        <header>Invoices This Month</header>
+        <p class="big-number" id="invoices-month">--</p>
+    </article>
+    <article id="card-overdue">
+        <header>Overdue</header>
+        <p class="big-number" id="overdue-count">--</p>
+    </article>
+    <article id="card-revenue">
+        <header>Revenue MTD</header>
+        <p class="big-number" id="revenue-mtd">$--</p>
+    </article>
+</div>
+
+<div class="grid">
+    <article>
+        <header>AR Aging</header>
+        <canvas id="aging-chart" height="200"></canvas>
+    </article>
+    <article>
+        <header>Monthly Revenue</header>
+        <canvas id="revenue-chart" height="200"></canvas>
+    </article>
+</div>
+
+<article>
+    <header>
+        Recent Activity
+        <span style="float:right">
+            <button class="outline small" onclick="batchGenerate()">Generate All Pending</button>
+            <button class="outline small" onclick="sendReminders()">Send Reminders</button>
+        </span>
+    </header>
+    <table>
+        <thead>
+            <tr><th>Date</th><th>Event</th><th>Invoice</th><th>Client</th><th>Amount</th></tr>
+        </thead>
+        <tbody id="activity-table">
+            <tr><td colspan="5">Loading...</td></tr>
+        </tbody>
+    </table>
+</article>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/dashboard.js"></script>
+{% endblock %}

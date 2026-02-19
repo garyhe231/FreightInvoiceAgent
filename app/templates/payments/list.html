@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% set active_page = "payments" %}
+
+{% block title %}Payments — Freight Invoice Agent{% endblock %}
+
+{% block content %}
+<h2>Payments</h2>
+
+<article>
+    <table>
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Invoice #</th>
+                <th>Client</th>
+                <th class="text-right">Amount</th>
+                <th>Method</th>
+                <th>Reference</th>
+            </tr>
+        </thead>
+        <tbody id="payments-table">
+            <tr><td colspan="6">Loading...</td></tr>
+        </tbody>
+    </table>
+</article>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function fmt(amount) {
+    return '$' + Number(amount || 0).toLocaleString(undefined, {minimumFractionDigits: 2});
+}
+
+async function loadPayments() {
+    const tbody = document.getElementById('payments-table');
+    tbody.innerHTML = '<tr><td colspan="6">Loading...</td></tr>';
+
+    try {
+        const resp = await fetch('/api/payments');
+        if (!resp.ok) throw new Error('Failed to load payments: ' + resp.statusText);
+        const data = await resp.json();
+
+        if (!data.length) {
+            tbody.innerHTML = '<tr><td colspan="6">No payments found.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = data.map(p => `
+            <tr>
+                <td>${p.payment_date || ''}</td>
+                <td><a href="/invoices/${p.invoice_id}">${p.invoice_number || '#' + p.invoice_id}</a></td>
+                <td>${p.client_name || ''}</td>
+                <td class="text-right">${fmt(p.amount)}</td>
+                <td>${p.payment_method || ''}</td>
+                <td>${p.reference_number || ''}</td>
+            </tr>
+        `).join('');
+    } catch (err) {
+        tbody.innerHTML = '<tr><td colspan="6">Error loading payments.</td></tr>';
+        alert(err.message);
+    }
+}
+
+document.addEventListener('DOMContentLoaded', loadPayments);
+</script>
+{% endblock %}

@@ -1,0 +1,374 @@
+{% extends "base.html" %}
+{% set active_page = "invoices" %}
+
+{% block title %}Invoice — Freight Invoice Agent{% endblock %}
+
+{% block content %}
+<div id="invoice-loading">
+    <h2>Loading invoice...</h2>
+</div>
+
+<div id="invoice-detail" style="display:none;">
+    <!-- Invoice Header -->
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+        <h2 style="margin:0;">
+            Invoice <span id="inv-number"></span>
+            <span id="inv-status-badge"></span>
+        </h2>
+        <div>
+            <span id="inv-issue-date" style="margin-right:1rem;"></span>
+            <span id="inv-due-date"></span>
+        </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div style="display:flex; gap:0.5rem; margin-bottom:1.5rem; flex-wrap:wrap;">
+        <button id="btn-send" class="outline" onclick="sendInvoice()" style="display:none;">Send Invoice</button>
+        <a id="btn-pdf" role="button" class="outline" target="_blank">Download PDF</a>
+        <button id="btn-record-payment" class="outline" onclick="togglePaymentForm()">Record Payment</button>
+        <button id="btn-void" class="outline secondary" onclick="voidInvoice()" style="display:none;">Void Invoice</button>
+    </div>
+
+    <!-- Record Payment Form (inline, hidden by default) -->
+    <article id="payment-form-card" style="display:none;">
+        <header>Record Payment</header>
+        <form id="payment-form" onsubmit="submitPayment(event)">
+            <div class="grid">
+                <label>
+                    Amount
+                    <input type="number" step="0.01" min="0.01" id="pay-amount" required>
+                </label>
+                <label>
+                    Date
+                    <input type="date" id="pay-date" required>
+                </label>
+                <label>
+                    Method
+                    <select id="pay-method" required>
+                        <option value="wire">Wire Transfer</option>
+                        <option value="check">Check</option>
+                        <option value="ach">ACH</option>
+                        <option value="credit_card">Credit Card</option>
+                        <option value="other">Other</option>
+                    </select>
+                </label>
+                <label>
+                    Reference
+                    <input type="text" id="pay-reference" placeholder="Transaction ref #">
+                </label>
+            </div>
+            <div style="display:flex; gap:0.5rem;">
+                <button type="submit" id="btn-submit-payment">Save Payment</button>
+                <button type="button" class="outline" onclick="togglePaymentForm()">Cancel</button>
+            </div>
+        </form>
+    </article>
+
+    <div class="grid">
+        <!-- Bill To -->
+        <article>
+            <header>Bill To</header>
+            <p id="bill-to-name" style="font-weight:600;"></p>
+            <p id="bill-to-email"></p>
+            <p id="bill-to-address"></p>
+        </article>
+        <!-- Shipment Reference -->
+        <article>
+            <header>Shipment Reference</header>
+            <p><strong>Booking:</strong> <span id="ref-booking"></span></p>
+            <p><strong>B/L Number:</strong> <span id="ref-bl"></span></p>
+            <p><strong>Route:</strong> <span id="ref-route"></span></p>
+            <p><strong>Vessel/Voyage:</strong> <span id="ref-vessel"></span></p>
+        </article>
+    </div>
+
+    <!-- Line Items -->
+    <article>
+        <header>Line Items</header>
+        <table>
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Charge Code</th>
+                    <th>Description</th>
+                    <th class="text-right">Qty</th>
+                    <th class="text-right">Unit Price</th>
+                    <th class="text-right">Total</th>
+                </tr>
+            </thead>
+            <tbody id="line-items-table">
+                <tr><td colspan="6">Loading...</td></tr>
+            </tbody>
+        </table>
+
+        <!-- Totals -->
+        <div style="max-width:300px; margin-left:auto; margin-top:1rem;">
+            <table>
+                <tbody>
+                    <tr><td>Subtotal</td><td class="text-right" id="tot-subtotal"></td></tr>
+                    <tr><td>Tax</td><td class="text-right" id="tot-tax"></td></tr>
+                    <tr style="font-weight:700;"><td>Total</td><td class="text-right" id="tot-total"></td></tr>
+                    <tr><td>Amount Paid</td><td class="text-right" id="tot-paid"></td></tr>
+                    <tr style="font-weight:700; font-size:1.1rem;"><td>Balance Due</td><td class="text-right" id="tot-balance"></td></tr>
+                </tbody>
+            </table>
+        </div>
+    </article>
+
+    <!-- Payment History -->
+    <article>
+        <header>Payment History</header>
+        <table>
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th class="text-right">Amount</th>
+                    <th>Method</th>
+                    <th>Reference</th>
+                </tr>
+            </thead>
+            <tbody id="payments-table">
+                <tr><td colspan="4">Loading...</td></tr>
+            </tbody>
+        </table>
+    </article>
+
+    <!-- Email Log -->
+    <article>
+        <header>Email Log</header>
+        <table>
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Recipient</th>
+                    <th>Subject</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody id="emails-table">
+                <tr><td colspan="4">Loading...</td></tr>
+            </tbody>
+        </table>
+    </article>
+
+    <!-- Notes -->
+    <article>
+        <header>Notes</header>
+        <div id="invoice-notes"><em>No notes.</em></div>
+    </article>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const INVOICE_ID = '{{ invoice_id }}';
+
+function fmt(amount) {
+    return '$' + Number(amount || 0).toLocaleString(undefined, {minimumFractionDigits: 2});
+}
+
+function togglePaymentForm() {
+    const card = document.getElementById('payment-form-card');
+    card.style.display = card.style.display === 'none' ? 'block' : 'none';
+    if (card.style.display === 'block') {
+        document.getElementById('pay-date').value = new Date().toISOString().split('T')[0];
+    }
+}
+
+async function loadInvoice() {
+    try {
+        const resp = await fetch('/api/invoices/' + INVOICE_ID);
+        if (!resp.ok) throw new Error('Failed to load invoice: ' + resp.statusText);
+        const inv = await resp.json();
+
+        document.title = 'Invoice ' + inv.invoice_number + ' — Freight Invoice Agent';
+        document.getElementById('inv-number').textContent = inv.invoice_number || '';
+        document.getElementById('inv-status-badge').innerHTML = `<span class="badge badge-${inv.status}">${inv.status}</span>`;
+        document.getElementById('inv-issue-date').textContent = 'Issued: ' + (inv.issue_date || '—');
+        document.getElementById('inv-due-date').textContent = 'Due: ' + (inv.due_date || '—');
+
+        // Action buttons visibility
+        if (inv.status === 'draft') {
+            document.getElementById('btn-send').style.display = '';
+            document.getElementById('btn-void').style.display = '';
+        } else if (inv.status !== 'void' && inv.status !== 'paid') {
+            document.getElementById('btn-void').style.display = '';
+        }
+        document.getElementById('btn-pdf').href = '/api/invoices/' + INVOICE_ID + '/pdf';
+
+        // Bill To
+        document.getElementById('bill-to-name').textContent = inv.client_name || '';
+        document.getElementById('bill-to-email').textContent = inv.client_email || '';
+        document.getElementById('bill-to-address').textContent = inv.client_address || '';
+
+        // Shipment Reference
+        document.getElementById('ref-booking').textContent = inv.booking_number || '—';
+        document.getElementById('ref-bl').textContent = inv.bl_number || '—';
+        document.getElementById('ref-route').textContent = (inv.origin_port || '—') + ' → ' + (inv.destination_port || '—');
+        document.getElementById('ref-vessel').textContent = (inv.vessel || '—') + ' / ' + (inv.voyage || '—');
+
+        // Line Items
+        const linesTbody = document.getElementById('line-items-table');
+        if (inv.line_items && inv.line_items.length) {
+            linesTbody.innerHTML = inv.line_items.map((item, i) => `
+                <tr>
+                    <td>${i + 1}</td>
+                    <td>${item.charge_code || ''}</td>
+                    <td>${item.description || ''}</td>
+                    <td class="text-right">${item.quantity || 0}</td>
+                    <td class="text-right">${fmt(item.unit_price)}</td>
+                    <td class="text-right">${fmt(item.total)}</td>
+                </tr>
+            `).join('');
+        } else {
+            linesTbody.innerHTML = '<tr><td colspan="6">No line items.</td></tr>';
+        }
+
+        // Totals
+        document.getElementById('tot-subtotal').textContent = fmt(inv.subtotal);
+        document.getElementById('tot-tax').textContent = fmt(inv.tax_amount);
+        document.getElementById('tot-total').textContent = fmt(inv.total_amount);
+        document.getElementById('tot-paid').textContent = fmt(inv.amount_paid);
+        document.getElementById('tot-balance').textContent = fmt(inv.balance_due);
+
+        // Notes
+        if (inv.notes) {
+            document.getElementById('invoice-notes').textContent = inv.notes;
+        }
+
+        document.getElementById('invoice-loading').style.display = 'none';
+        document.getElementById('invoice-detail').style.display = '';
+
+    } catch (err) {
+        document.getElementById('invoice-loading').innerHTML = '<h2>Error loading invoice</h2>';
+        alert(err.message);
+    }
+}
+
+async function loadPayments() {
+    const tbody = document.getElementById('payments-table');
+    try {
+        const resp = await fetch('/api/payments?invoice_id=' + INVOICE_ID);
+        if (!resp.ok) throw new Error('Failed to load payments');
+        const data = await resp.json();
+
+        if (!data.length) {
+            tbody.innerHTML = '<tr><td colspan="4">No payments recorded.</td></tr>';
+            return;
+        }
+        tbody.innerHTML = data.map(p => `
+            <tr>
+                <td>${p.payment_date || ''}</td>
+                <td class="text-right">${fmt(p.amount)}</td>
+                <td>${p.payment_method || ''}</td>
+                <td>${p.reference_number || ''}</td>
+            </tr>
+        `).join('');
+    } catch (err) {
+        tbody.innerHTML = '<tr><td colspan="4">Error loading payments.</td></tr>';
+    }
+}
+
+async function loadEmails() {
+    const tbody = document.getElementById('emails-table');
+    try {
+        const resp = await fetch('/api/invoices/' + INVOICE_ID + '/emails');
+        if (!resp.ok) throw new Error('Failed to load emails');
+        const data = await resp.json();
+
+        if (!data.length) {
+            tbody.innerHTML = '<tr><td colspan="4">No emails sent.</td></tr>';
+            return;
+        }
+        tbody.innerHTML = data.map(e => `
+            <tr>
+                <td>${e.sent_at || ''}</td>
+                <td>${e.recipient || ''}</td>
+                <td>${e.subject || ''}</td>
+                <td>${e.status || ''}</td>
+            </tr>
+        `).join('');
+    } catch (err) {
+        tbody.innerHTML = '<tr><td colspan="4">Error loading email log.</td></tr>';
+    }
+}
+
+async function sendInvoice() {
+    const btn = document.getElementById('btn-send');
+    btn.disabled = true;
+    btn.textContent = 'Sending...';
+    try {
+        const resp = await fetch('/api/invoices/' + INVOICE_ID + '/send', { method: 'POST' });
+        if (!resp.ok) {
+            const err = await resp.json();
+            throw new Error(err.detail || 'Failed to send invoice');
+        }
+        alert('Invoice sent successfully.');
+        location.reload();
+    } catch (err) {
+        alert(err.message);
+        btn.disabled = false;
+        btn.textContent = 'Send Invoice';
+    }
+}
+
+async function voidInvoice() {
+    if (!confirm('Are you sure you want to void this invoice? This action cannot be undone.')) return;
+    const btn = document.getElementById('btn-void');
+    btn.disabled = true;
+    btn.textContent = 'Voiding...';
+    try {
+        const resp = await fetch('/api/invoices/' + INVOICE_ID + '/void', { method: 'POST' });
+        if (!resp.ok) {
+            const err = await resp.json();
+            throw new Error(err.detail || 'Failed to void invoice');
+        }
+        alert('Invoice voided.');
+        location.reload();
+    } catch (err) {
+        alert(err.message);
+        btn.disabled = false;
+        btn.textContent = 'Void Invoice';
+    }
+}
+
+async function submitPayment(e) {
+    e.preventDefault();
+    const btn = document.getElementById('btn-submit-payment');
+    btn.disabled = true;
+    btn.textContent = 'Saving...';
+
+    const payload = {
+        invoice_id: parseInt(INVOICE_ID),
+        amount: parseFloat(document.getElementById('pay-amount').value),
+        payment_date: document.getElementById('pay-date').value,
+        payment_method: document.getElementById('pay-method').value,
+        reference_number: document.getElementById('pay-reference').value
+    };
+
+    try {
+        const resp = await fetch('/api/payments', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        if (!resp.ok) {
+            const err = await resp.json();
+            throw new Error(err.detail || 'Failed to record payment');
+        }
+        alert('Payment recorded successfully.');
+        location.reload();
+    } catch (err) {
+        alert(err.message);
+        btn.disabled = false;
+        btn.textContent = 'Save Payment';
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    loadInvoice();
+    loadPayments();
+    loadEmails();
+});
+</script>
+{% endblock %}

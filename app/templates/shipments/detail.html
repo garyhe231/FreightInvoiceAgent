@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% set active_page = "shipments" %}
+
+{% block title %}Shipment — Freight Invoice Agent{% endblock %}
+
+{% block content %}
+<div id="shipment-loading">
+    <h2>Loading shipment...</h2>
+</div>
+
+<div id="shipment-detail" style="display:none;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+        <h2 style="margin:0;">Shipment <span id="sh-booking"></span></h2>
+        <span id="sh-status-badge"></span>
+    </div>
+
+    <div class="grid">
+        <!-- Booking Info -->
+        <article>
+            <header>Booking Info</header>
+            <table>
+                <tbody>
+                    <tr><td><strong>Booking Number</strong></td><td id="sh-booking-number"></td></tr>
+                    <tr><td><strong>B/L Number</strong></td><td id="sh-bl-number"></td></tr>
+                    <tr><td><strong>Status</strong></td><td id="sh-status"></td></tr>
+                </tbody>
+            </table>
+        </article>
+
+        <!-- Parties -->
+        <article>
+            <header>Parties</header>
+            <table>
+                <tbody>
+                    <tr><td><strong>Shipper</strong></td><td id="sh-shipper"></td></tr>
+                    <tr><td><strong>Consignee</strong></td><td id="sh-consignee"></td></tr>
+                    <tr><td><strong>Bill To</strong></td><td id="sh-bill-to"></td></tr>
+                </tbody>
+            </table>
+        </article>
+    </div>
+
+    <div class="grid">
+        <!-- Route -->
+        <article>
+            <header>Route</header>
+            <table>
+                <tbody>
+                    <tr><td><strong>Origin Port</strong></td><td id="sh-origin"></td></tr>
+                    <tr><td><strong>Destination Port</strong></td><td id="sh-destination"></td></tr>
+                    <tr><td><strong>Vessel</strong></td><td id="sh-vessel"></td></tr>
+                    <tr><td><strong>Voyage</strong></td><td id="sh-voyage"></td></tr>
+                    <tr><td><strong>ETD</strong></td><td id="sh-etd"></td></tr>
+                    <tr><td><strong>ETA</strong></td><td id="sh-eta"></td></tr>
+                </tbody>
+            </table>
+        </article>
+
+        <!-- Cargo -->
+        <article>
+            <header>Cargo</header>
+            <table>
+                <tbody>
+                    <tr><td><strong>Container Type</strong></td><td id="sh-container-type"></td></tr>
+                    <tr><td><strong>Container Count</strong></td><td id="sh-container-count"></td></tr>
+                    <tr><td><strong>CBM</strong></td><td id="sh-cbm"></td></tr>
+                    <tr><td><strong>Weight (kg)</strong></td><td id="sh-weight"></td></tr>
+                    <tr><td><strong>Commodity</strong></td><td id="sh-commodity"></td></tr>
+                </tbody>
+            </table>
+        </article>
+    </div>
+
+    <!-- Linked Invoice -->
+    <article id="linked-invoice-card">
+        <header>Linked Invoice</header>
+        <div id="linked-invoice-content">
+            <p>No invoice generated for this shipment.</p>
+        </div>
+    </article>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const SHIPMENT_ID = '{{ shipment_id }}';
+
+async function loadShipment() {
+    try {
+        const resp = await fetch('/api/shipments/' + SHIPMENT_ID);
+        if (!resp.ok) throw new Error('Failed to load shipment: ' + resp.statusText);
+        const s = await resp.json();
+
+        document.title = 'Shipment ' + s.booking_number + ' — Freight Invoice Agent';
+        document.getElementById('sh-booking').textContent = s.booking_number || '';
+        document.getElementById('sh-status-badge').innerHTML = `<span class="badge badge-${s.status || 'draft'}">${s.status || ''}</span>`;
+
+        document.getElementById('sh-booking-number').textContent = s.booking_number || '—';
+        document.getElementById('sh-bl-number').textContent = s.bl_number || '—';
+        document.getElementById('sh-status').textContent = s.status || '—';
+
+        document.getElementById('sh-shipper').textContent = s.shipper_name || '—';
+        document.getElementById('sh-consignee').textContent = s.consignee_name || '—';
+        document.getElementById('sh-bill-to').textContent = s.bill_to || '—';
+
+        document.getElementById('sh-origin').textContent = s.origin_port || '—';
+        document.getElementById('sh-destination').textContent = s.destination_port || '—';
+        document.getElementById('sh-vessel').textContent = s.vessel || '—';
+        document.getElementById('sh-voyage').textContent = s.voyage || '—';
+        document.getElementById('sh-etd').textContent = s.etd || '—';
+        document.getElementById('sh-eta').textContent = s.eta || '—';
+
+        document.getElementById('sh-container-type').textContent = s.container_type || '—';
+        document.getElementById('sh-container-count').textContent = s.container_count || '—';
+        document.getElementById('sh-cbm').textContent = s.cbm || '—';
+        document.getElementById('sh-weight').textContent = s.weight_kg || '—';
+        document.getElementById('sh-commodity').textContent = s.commodity_description || '—';
+
+        // Linked Invoice
+        if (s.invoice_id) {
+            document.getElementById('linked-invoice-content').innerHTML =
+                `<p><a href="/invoices/${s.invoice_id}">Invoice ${s.invoice_number || '#' + s.invoice_id}</a></p>`;
+        }
+
+        document.getElementById('shipment-loading').style.display = 'none';
+        document.getElementById('shipment-detail').style.display = '';
+
+    } catch (err) {
+        document.getElementById('shipment-loading').innerHTML = '<h2>Error loading shipment</h2>';
+        alert(err.message);
+    }
+}
+
+document.addEventListener('DOMContentLoaded', loadShipment);
+</script>
+{% endblock %}

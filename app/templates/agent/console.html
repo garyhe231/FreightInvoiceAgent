@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+{% set active_page = "agent" %}
+
+{% block title %}AI Agent Console — Freight Invoice Agent{% endblock %}
+
+{% block content %}
+<h2>AI Agent Console</h2>
+
+<!-- Action Cards -->
+<div class="grid">
+    <article>
+        <header>Generate Pending Invoices</header>
+        <p>Automatically generate invoices for all unbilled shipments.</p>
+        <button id="btn-generate" onclick="runAction('generate')">Generate Pending Invoices</button>
+        <div id="result-generate" style="margin-top:1rem; display:none;"></div>
+    </article>
+
+    <article>
+        <header>Send Overdue Reminders</header>
+        <p>Send email reminders for all overdue invoices.</p>
+        <button id="btn-reminders" onclick="runAction('reminders')">Send Overdue Reminders</button>
+        <div id="result-reminders" style="margin-top:1rem; display:none;"></div>
+    </article>
+
+    <article>
+        <header>Check Anomalies</header>
+        <p>Scan invoices and payments for anomalies or inconsistencies.</p>
+        <button id="btn-anomalies" onclick="runAction('anomalies')">Check Anomalies</button>
+        <div id="result-anomalies" style="margin-top:1rem; display:none;"></div>
+    </article>
+</div>
+
+<!-- Activity Log -->
+<article>
+    <header>Activity Log</header>
+    <table>
+        <thead>
+            <tr>
+                <th>Time</th>
+                <th>Action</th>
+                <th>Details</th>
+            </tr>
+        </thead>
+        <tbody id="logs-table">
+            <tr><td colspan="3">Loading...</td></tr>
+        </tbody>
+    </table>
+</article>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const ACTION_CONFIG = {
+    generate: {
+        url: '/api/agent/generate-batch',
+        btnId: 'btn-generate',
+        resultId: 'result-generate',
+        label: 'Generate Pending Invoices'
+    },
+    reminders: {
+        url: '/api/agent/send-reminders',
+        btnId: 'btn-reminders',
+        resultId: 'result-reminders',
+        label: 'Send Overdue Reminders'
+    },
+    anomalies: {
+        url: '/api/agent/check-anomalies',
+        btnId: 'btn-anomalies',
+        resultId: 'result-anomalies',
+        label: 'Check Anomalies'
+    }
+};
+
+async function runAction(action) {
+    const config = ACTION_CONFIG[action];
+    const btn = document.getElementById(config.btnId);
+    const resultDiv = document.getElementById(config.resultId);
+
+    btn.disabled = true;
+    btn.textContent = 'Processing...';
+    btn.setAttribute('aria-busy', 'true');
+    resultDiv.style.display = 'none';
+
+    try {
+        const resp = await fetch(config.url, { method: 'POST' });
+        if (!resp.ok) {
+            const err = await resp.json();
+            throw new Error(err.detail || 'Action failed');
+        }
+        const data = await resp.json();
+
+        resultDiv.style.display = 'block';
+        resultDiv.innerHTML = '<mark>' + formatResult(data) + '</mark>';
+
+        // Reload the activity log
+        loadLogs();
+    } catch (err) {
+        resultDiv.style.display = 'block';
+        resultDiv.innerHTML = '<mark style="background:#ffcdd2; color:#c62828;">Error: ' + escapeHtml(err.message) + '</mark>';
+    } finally {
+        btn.disabled = false;
+        btn.textContent = config.label;
+        btn.removeAttribute('aria-busy');
+    }
+}
+
+function formatResult(data) {
+    if (typeof data === 'string') return escapeHtml(data);
+    if (data.message) return escapeHtml(data.message);
+    if (data.summary) return escapeHtml(data.summary);
+    if (data.generated !== undefined) return 'Generated ' + data.generated + ' invoice(s).';
+    if (data.sent !== undefined) return 'Sent ' + data.sent + ' reminder(s).';
+    if (data.anomalies !== undefined) return 'Found ' + data.anomalies + ' anomaly(ies).';
+    return escapeHtml(JSON.stringify(data));
+}
+
+function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
+async function loadLogs() {
+    const tbody = document.getElementById('logs-table');
+    tbody.innerHTML = '<tr><td colspan="3">Loading...</td></tr>';
+
+    try {
+        const resp = await fetch('/api/agent/logs');
+        if (!resp.ok) throw new Error('Failed to load logs: ' + resp.statusText);
+        const data = await resp.json();
+
+        if (!data.length) {
+            tbody.innerHTML = '<tr><td colspan="3">No activity logged yet.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = data.map(log => `
+            <tr>
+                <td>${log.timestamp || log.created_at || ''}</td>
+                <td>${log.action || ''}</td>
+                <td>${log.details || log.message || ''}</td>
+            </tr>
+        `).join('');
+    } catch (err) {
+        tbody.innerHTML = '<tr><td colspan="3">Error loading activity log.</td></tr>';
+        alert(err.message);
+    }
+}
+
+document.addEventListener('DOMContentLoaded', loadLogs);
+</script>
+{% endblock %}
