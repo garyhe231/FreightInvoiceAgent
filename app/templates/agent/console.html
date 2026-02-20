@@ -108,9 +108,14 @@ function formatResult(data) {
     if (typeof data === 'string') return escapeHtml(data);
     if (data.message) return escapeHtml(data.message);
     if (data.summary) return escapeHtml(data.summary);
-    if (data.generated !== undefined) return 'Generated ' + data.generated + ' invoice(s).';
-    if (data.sent !== undefined) return 'Sent ' + data.sent + ' reminder(s).';
-    if (data.anomalies !== undefined) return 'Found ' + data.anomalies + ' anomaly(ies).';
+    if (data.count !== undefined && data.generated !== undefined) {
+        const errors = data.errors ? data.errors.length : 0;
+        let msg = 'Generated ' + data.count + ' invoice(s).';
+        if (errors > 0) msg += ' ' + errors + ' shipment(s) skipped (no matching rate card).';
+        return msg;
+    }
+    if (data.count !== undefined && data.newly_overdue !== undefined) return 'Sent ' + data.count + ' reminder(s). ' + data.newly_overdue + ' newly overdue.';
+    if (data.count !== undefined && data.anomalies !== undefined) return 'Found ' + data.count + ' anomaly(ies).';
     return escapeHtml(JSON.stringify(data));
 }
 
@@ -138,7 +143,7 @@ async function loadLogs() {
             <tr>
                 <td>${log.timestamp || log.created_at || ''}</td>
                 <td>${log.action || ''}</td>
-                <td>${log.details || log.message || ''}</td>
+                <td>${log.output_data || log.details || log.message || ''}</td>
             </tr>
         `).join('');
     } catch (err) {
