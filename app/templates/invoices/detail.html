@@ -209,15 +209,15 @@ async function loadInvoice() {
 
         // Line Items
         const linesTbody = document.getElementById('line-items-table');
-        if (inv.line_items && inv.line_items.length) {
-            linesTbody.innerHTML = inv.line_items.map((item, i) => `
+        if (inv.lines && inv.lines.length) {
+            linesTbody.innerHTML = inv.lines.map((item, i) => `
                 <tr>
                     <td>${i + 1}</td>
                     <td>${item.charge_code || ''}</td>
                     <td>${item.description || ''}</td>
                     <td class="text-right">${item.quantity || 0}</td>
                     <td class="text-right">${fmt(item.unit_price)}</td>
-                    <td class="text-right">${fmt(item.total)}</td>
+                    <td class="text-right">${fmt(item.line_total)}</td>
                 </tr>
             `).join('');
         } else {
